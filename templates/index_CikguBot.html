@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GameBuddy - Gamer Assistant Chatbot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: 'Orbitron', sans-serif;
+      background-color: black;
+      color: #f2f2f2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+    canvas#starfield {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: -1;
+    }
+    .banner {
+      text-align: center;
+      max-width: 1000px;
+      margin: 20px auto;
+    }
+    .banner h1 { color: #00ff99; font-size: 36px; }
+    #clock { font-size: 18px; color: #00ffcc; margin-bottom: 10px; text-align: center; }
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+    .stats-bar span { color: #00ffcc; }
+    .split-container {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+      max-width: 1200px;
+    }
+    .module-container {
+      flex: 1;
+      background-color: #1f1f1f;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 0 10px #00ff99;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-box {
+      flex-grow: 1;
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 15px;
+      overflow-y: auto;
+      background-color: #121212;
+      margin-bottom: 20px;
+      height: 400px;
+    }
+    .user, .bot {
+      margin: 10px 0;
+      padding: 10px 15px;
+      border-radius: 10px;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+    .user { background-color: #0055ff; color: #fff; align-self: flex-end; }
+    .bot { background-color: #00ff99; color: #000; align-self: flex-start; }
+    .input-container { display: flex; gap: 10px; }
+    #user-input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #666;
+      font-size: 16px;
+      background-color: #222;
+      color: #fff;
+    }
+    button {
+      background-color: #00ff99;
+      color: #000;
+      border: none;
+      border-radius: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+    }
+    button:hover { background-color: #00cc77; }
+    button:disabled { background-color: #555; cursor: not-allowed; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border: 1px solid #555;
+    }
+    th { background-color: #00ffcc; color: #000; }
+    td a { color: #00ffff; text-decoration: none; }
+    .quiz-container {
+      margin-top: 40px;
+      max-width: 700px;
+      width: 100%;
+      background-color: #1f1f1f;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 0 10px #ff9900;
+    }
+    .quiz-container h3 { color: #ff9900; }
+    .quiz-choice {
+      display: block;
+      width: 100%;
+      text-align: left;
+      margin: 8px 0;
+      padding: 10px 15px;
+      background-color: #2a2a2a;
+      color: #fff;
+      border: 1px solid #555;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    .quiz-choice:hover { background-color: #3a3a3a; border-color: #ff9900; }
+    #quiz-result { margin-top: 10px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <canvas id="starfield"></canvas>
+
+  <div class="banner">
+    <h1>🎮 GameBuddy - Your Gamer Assistant</h1>
+    <div id="clock"></div>
+  </div>
+
+  <div class="stats-bar">
+    <span>🏆 Points: <strong id="points-display">0</strong></span>
+    <span>⭐️ Stickers: <strong id="stickers-display">None</strong></span>
+  </div>
+
+  <!-- Voice Buttons -->
+  <div style="text-align: center;">
+    <button onclick="startVoiceInput()">🎙️ Speak to GameBuddy</button>
+    <button onclick="stopVoiceInput()">🛑 Stop</button>
+    <button onclick="clearChat()">🗑️ Clear Chat</button>
+    <p id="voice-status" style="margin-top:10px;"></p>
+  </div>
+
+  <!-- Chat Module -->
+  <div class="split-container">
+    <div class="module-container">
+      <div class="chat-box" id="chat-box"></div>
+      <div class="input-container">
+        <input type="text" id="user-input" placeholder="Ask me about a game..." onkeydown="checkEnter(event)">
+        <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Steam Table -->
+  <div style="margin-top: 40px; max-width: 1200px; width: 100%;">
+    <h3 style="color: #00ffcc;">🔥 Steam Discounted Games</h3>
+    <table id="steam-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Price (USD)</th>
+          <th>Discount</th>
+          <th>Link</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Discount Chart -->
+  <div style="margin-top: 60px; max-width: 700px; width: 100%;">
+    <h3 style="color: #00ffcc;">📊 Discount Overview</h3>
+    <canvas id="discountChart"></canvas>
+  </div>
+
+  <!-- Quiz Module -->
+  <div class="quiz-container">
+    <h3>🧠 Gaming Quiz</h3>
+    <div style="display:flex; gap:10px; margin-bottom:15px;">
+      <input type="text" id="quiz-topic" placeholder="Quiz topic (e.g. Minecraft, RPGs...)" style="flex:1; padding:10px; border-radius:5px; border:1px solid #666; background:#222; color:#fff; font-size:14px;">
+      <button onclick="generateQuiz()">Generate Quiz</button>
+    </div>
+    <div id="quiz-question" style="margin-bottom:10px;"></div>
+    <div id="quiz-choices"></div>
+    <div id="quiz-result"></div>
+  </div>
+
+  <script>
+    // 🌌 Starfield
+    const canvas = document.getElementById('starfield');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+    let stars = Array(150).fill().map(() => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height }));
+    function drawStars() {
+      ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white';
+      stars.forEach(s => {
+        ctx.beginPath(); ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2); ctx.fill();
+        s.x += 0.8; if (s.x > canvas.width) { s.x = 0; s.y = Math.random() * canvas.height; }
+      });
+      requestAnimationFrame(drawStars);
+    }
+    drawStars();
+
+    // 🕒 Clock
+    function updateClock() {
+      const malaysiaTime = new Date().toLocaleString("en-MY", {
+        timeZone: "Asia/Kuala_Lumpur", hour: "2-digit", minute: "2-digit", second: "2-digit",
+        weekday: "short", day: "numeric", month: "short", year: "numeric"
+      });
+      document.getElementById("clock").textContent = `🕒 Malaysia Time: ${malaysiaTime}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function updateStats(points, stickers) {
+      document.getElementById("points-display").textContent = points || 0;
+      document.getElementById("stickers-display").textContent = stickers || "None";
+    }
+
+    // 🗣️ Chat
+    async function sendMessage() {
+      const inputField = document.getElementById("user-input");
+      const message = inputField.value;
+      if (!message) return;
+
+      const chatBox = document.getElementById("chat-box");
+
+      const userMsg = document.createElement("div");
+      userMsg.className = "user";
+      userMsg.textContent = message;
+      chatBox.appendChild(userMsg);
+
+      inputField.value = "";
+
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, username: "guest" })
+        });
+
+        const data = await response.json();
+
+        const botMsgContainer = document.createElement("div");
+        botMsgContainer.className = "bot";
+
+        const botText = document.createElement("span");
+        botText.textContent = data.response;
+
+        const speakBtn = document.createElement("button");
+        speakBtn.textContent = "🔊";
+        speakBtn.style.marginLeft = "10px";
+        speakBtn.style.backgroundColor = "#00ff99";
+        speakBtn.style.border = "none";
+        speakBtn.style.color = "#000";
+        speakBtn.style.cursor = "pointer";
+        speakBtn.style.borderRadius = "5px";
+        speakBtn.style.padding = "2px 8px";
+
+        speakBtn.onclick = () => {
+          const utterance = new SpeechSynthesisUtterance(data.response);
+          utterance.lang = 'en-US';
+          speechSynthesis.speak(utterance);
+        };
+
+        botMsgContainer.appendChild(botText);
+        botMsgContainer.appendChild(speakBtn);
+        chatBox.appendChild(botMsgContainer);
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        if (data.points !== undefined) {
+          updateStats(data.points, data.stickers);
+        }
+      } catch (e) {
+        const errMsg = document.createElement("div");
+        errMsg.className = "bot";
+        errMsg.textContent = "Error: Could not reach GameBuddy server.";
+        chatBox.appendChild(errMsg);
+      }
+    }
+
+    function checkEnter(event) { if (event.key === "Enter") sendMessage(); }
+
+    async function clearChat() {
+      document.getElementById("chat-box").innerHTML = "";
+      await fetch("/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "guest" })
+      });
+    }
+
+    // 📊 Steam Discounts Table + Chart
+    async function fetchSteamDiscounts() {
+      try {
+        const res = await fetch("/steam_discounts");
+        const data = await res.json();
+
+        if (data.error) {
+          console.error("Steam API error:", data.error);
+          return;
+        }
+
+        const tbody = document.getElementById("steam-table").querySelector("tbody");
+        tbody.innerHTML = "";
+        data.forEach(game => {
+          const row = document.createElement("tr");
+          const nameCell = document.createElement("td");
+          nameCell.textContent = game.name;
+          const priceCell = document.createElement("td");
+          priceCell.textContent = "$" + game.price.toFixed(2);
+          const discountCell = document.createElement("td");
+          discountCell.textContent = game.discount + "%";
+          const linkCell = document.createElement("td");
+          const link = document.createElement("a");
+          link.href = game.url;
+          link.target = "_blank";
+          link.textContent = "View";
+          linkCell.appendChild(link);
+          row.appendChild(nameCell);
+          row.appendChild(priceCell);
+          row.appendChild(discountCell);
+          row.appendChild(linkCell);
+          tbody.appendChild(row);
+        });
+
+        drawDiscountChart(data);
+      } catch (e) {
+        console.error("Failed to fetch Steam discounts:", e);
+      }
+    }
+    setInterval(fetchSteamDiscounts, 60000);
+    fetchSteamDiscounts();
+
+    let discountChartInstance = null;
+    function drawDiscountChart(data) {
+      const labels = data.map(game => game.name);
+      const discounts = data.map(game => game.discount);
+      const chartCtx = document.getElementById("discountChart").getContext("2d");
+
+      if (discountChartInstance) {
+        discountChartInstance.destroy();
+      }
+
+      discountChartInstance = new Chart(chartCtx, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: "Discount %",
+            data: discounts,
+            backgroundColor: "#ff9900",
+            borderColor: "#cc7700",
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true, max: 100 }
+          }
+        }
+      });
+    }
+
+    // 🧠 Quiz
+    let currentCorrectAnswer = "";
+
+    async function generateQuiz() {
+      const topic = document.getElementById("quiz-topic").value || "general game knowledge";
+      document.getElementById("quiz-question").textContent = "Loading...";
+      document.getElementById("quiz-choices").innerHTML = "";
+      document.getElementById("quiz-result").textContent = "";
+
+      try {
+        const res = await fetch("/generate_quiz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          document.getElementById("quiz-question").textContent = "Error: " + data.error;
+          return;
+        }
+
+        document.getElementById("quiz-question").textContent = data.question;
+        currentCorrectAnswer = data.correct_answer;
+
+        const choicesDiv = document.getElementById("quiz-choices");
+        choicesDiv.innerHTML = "";
+        data.choices.forEach(choice => {
+          const btn = document.createElement("button");
+          btn.className = "quiz-choice";
+          btn.textContent = choice;
+          btn.onclick = () => submitQuizAnswer(choice);
+          choicesDiv.appendChild(btn);
+        });
+      } catch (e) {
+        document.getElementById("quiz-question").textContent = "Failed to generate quiz.";
+      }
+    }
+
+    async function submitQuizAnswer(answer) {
+      try {
+        const res = await fetch("/quiz_answer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answer, correct_answer: currentCorrectAnswer, username: "guest" })
+        });
+        const data = await res.json();
+        document.getElementById("quiz-result").textContent = data.message;
+        if (data.points !== undefined) {
+          updateStats(data.points, data.stickers);
+        }
+      } catch (e) {
+        document.getElementById("quiz-result").textContent = "Error submitting answer.";
+      }
+    }
+
+    // 🎙️ Voice Input
+    let recognition;
+    let isListening = false;
+    function startVoiceInput() {
+      const status = document.getElementById('voice-status');
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        status.textContent = '❌ Voice input not supported in this browser.';
+        return;
+      }
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onstart = () => {
+        isListening = true;
+        status.textContent = '🎤 Listening...';
+      };
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        status.textContent = `You said: "${transcript}"`;
+        document.getElementById('user-input').value = transcript;
+        sendMessage();
+      };
+      recognition.onerror = (event) => {
+        status.textContent = '⚠️ Error: ' + event.error;
+      };
+      recognition.onend = () => {
+        isListening = false;
+      };
+      recognition.start();
+    }
+    function stopVoiceInput() {
+      if (recognition && isListening) {
+        recognition.stop();
+        document.getElementById('voice-status').textContent = '🎤 Stopped listening.';
+      }
+    }
+  </script>
+</body>
+</html>
